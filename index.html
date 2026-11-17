@@ -246,7 +246,7 @@ const lamps=[];
   const fence=(x,z,w,ry)=>{const m=fm.clone();m.map=fm.map.clone();m.map.needsUpdate=true;m.map.repeat.set(w/1.2,1.4);const f=new T.Mesh(new T.PlaneGeometry(w,1.7),m);f.position.set(x,1.75,z);f.rotation.y=ry;scene.add(f)};
   fence(0,LOT.z1+.3,W,0);fence(LOT.x0-.3,cz,D,PI/2);fence(LOT.x1+.3,cz,D,PI/2);
   // building: long two-storey business park, white fins + glass, orange gable ends
-  const SIGNS=[['OPTIKA','#3aa0ff'],['KAVINĖ','#ffb347'],['REKON','#ff6a00'],['BIURAI','#ffffff'],['EDIRXEPA AUTO','#d04bff'],['SPORTAS','#56d98a'],['BALDAI','#ffe21a']];
+  const SIGNS=[['FAMILIA OPTICA','#3aa0ff'],['KAVINĖ','#ffb347'],['REKON','#ff6a00'],['BIURAI','#ffffff'],['EDIRXEPA AUTO','#d04bff'],['SPORTAS','#56d98a'],['BALDAI','#ffe21a']];
   const fac=(lit)=>ctex(2048,192,(g,w,h)=>{seed=91;
     const gg=g.createLinearGradient(0,0,0,h);gg.addColorStop(0,lit?'#000':'#22364a');gg.addColorStop(1,lit?'#000':'#101a26');g.fillStyle=gg;g.fillRect(0,0,w,h);
     for(let x=0;x<w;x+=20)for(const y of[16,106]){const on=srand()<.28;if(on){g.fillStyle=lit?(srand()<.5?'#ffd9a0':'#cfe0ff'):'#e8cf9c';g.fillRect(x+5,y,15,74)}else if(!lit&&srand()<.5){g.fillStyle='rgba(255,170,110,.10)';g.fillRect(x+5,y,15,74)}}
