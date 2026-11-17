@@ -31,10 +31,17 @@ Apsaugos: slaptažodžiai hash'uojami serveryje (bcrypt); 5 neteisingi bandymai 
 įrenginį, kuris jau buvo prisijungęs); rezultatas priimamas tik su vienkartiniu misijos bilietu (`lv_start` →
 `lv_finish`), ne greičiau kaip po 15 s ir neviršijant misijos lubų.
 
-## Žinomos spragos ir nepatikrinti dalykai
-- `lv_start` / `lv_finish` ir įrenginio išimtis `lv_login` funkcijoje pritaikyti, bet dar NEPATIKRINTI nei SQL lygiu,
-  nei iš naršyklės. Pirmas dalykas, kurį verta padaryti: užsiregistruoti, įvykdyti 1 misiją ir pažiūrėti,
-  ar rezultatas atsiranda lentelėje „Geriausi agentai“.
+## Patikrinta (2026-11-17, iš naršyklės per GitHub Pages)
+- Registracija (`lv_register`), sesijos atkūrimas perkrovus puslapį (`lv_resume`) ir prisijungimas (`lv_login`).
+- 1 misija: `lv_start` grąžina bilietą, `lv_finish` po >15 s priima rezultatą, jis atsiranda lentelėje
+  „Geriausi agentai“ (`lv_board`) ir agento rekorduose.
+- Atmetama: finišas greičiau nei po 15 s, tas pats bilietas antrą kartą, svetimas token, neegzistuojanti misija.
+- Užrakinimas: po 5 klaidingų slaptažodžių svetimas įrenginys gauna `locked`; jau prisijungęs įrenginys
+  prisijungia ir užraktą nuima.
+- Nepatikrinta: pats žaidimas pele ir klaviatūra (testo metu tikslai įvykdyti žaidimo funkcijomis, misija
+  baigta tikru E klavišu prie durų).
+
+## Žinomos spragos
 - Taškai skaičiuojami naršyklėje, tad maksimalų įmanomą rezultatą vis dar galima suklastoti.
 - Žaidimas skirtas kompiuteriui (klaviatūra + pelė); telefone neveikia.
 - Parkingo išplanavimas apytikslis – pastatas pagal vieną nuotrauką iš drono.
