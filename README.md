@@ -31,6 +31,11 @@ Apsaugos: slaptažodžiai hash'uojami serveryje (bcrypt); 5 neteisingi bandymai 
 įrenginį, kuris jau buvo prisijungęs); rezultatas priimamas tik su vienkartiniu misijos bilietu (`lv_start` →
 `lv_finish`), ne greičiau kaip po 15 s ir neviršijant misijos lubų.
 
+## Laikas ir lentelė „Geriausi agentai“
+Misijos laiką matuoja serveris (`lv_start` → `lv_finish`), todėl naršyklėje jo suklastoti negalima; pauzė įskaitoma.
+Kiekvienai misijai saugomas geriausias (mažiausias) laikas `lv_players.best_time`. Lentelė rikiuojama:
+1) daugiau įvykdytų misijų, 2) mažesnė geriausių laikų suma, 3) daugiau taškų.
+
 ## Admin
 Agentas su `lv_players.is_admin = true` (dabar – `admin`; slaptažodis čia nesaugomas):
 - mato visas 6 misijas iškart ir nerodomas lentelėje „Geriausi agentai“;

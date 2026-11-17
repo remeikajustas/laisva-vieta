@@ -42,6 +42,8 @@ td{padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.07)}
 td:first-child{color:var(--mut);width:28px}
 td:last-child{text-align:right;font-family:Oswald;font-size:16px}
 tr.me td{color:var(--gold)}
+.top .who{white-space:nowrap;line-height:1.55}
+#board td.bm{color:var(--mut);text-align:right;font-size:13px;white-space:nowrap}
 #admList td,#admList th{padding:7px 8px;text-align:left;font-family:inherit;font-size:14px;color:var(--txt);width:auto;border-bottom:1px solid rgba(255,255,255,.07)}
 #admList th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase}
 #admList td.lk{color:#ff6b5e}#admList td.act{text-align:right;white-space:nowrap}
@@ -136,7 +138,7 @@ kbd{background:#1b1f2a;border:1px solid #333a4a;border-radius:3px;padding:1px 6p
     <div class="who">Agentas<br><b id="whoName"></b><br><span id="whoTot"></span><br><a id="musBtn">Muzika: įjungta</a> · <a id="logout">Atsijungti</a><span id="admLink" style="display:none"> · <a id="admBtn">Admin</a></span></div></div>
   <div class="grid">
     <div><h2>Misijos</h2><div id="misList"></div></div>
-    <div><h2>Geriausi agentai</h2><table id="board"></table><div class="note" id="boardNote"></div>
+    <div><h2>Geriausi agentai</h2><div class="note" style="margin:-4px 0 8px">Rikiuojama pagal įvykdytas misijas, o jų skaičiui sutapus – pagal geriausių laikų sumą (greitesnis aukščiau).</div><table id="board"></table><div class="note" id="boardNote"></div>
       <div class="keys"><kbd>W A S D</kbd> judėti · <kbd>Pelė</kbd> dairytis · <kbd>Shift</kbd> bėgti (triukšminga) · <kbd>C</kbd> pritūpti (tyliau, slepia už auto) · <kbd>1–6</kbd> / ratukas – įrankis · <kbd>KPM</kbd> naudoti · <kbd>G</kbd> sprogdinti C4 · <kbd>M</kbd> žemėlapis · <kbd>E</kbd> grįžti į biurą · <kbd>N</kbd> muzika · <kbd>Esc</kbd> pauzė</div></div>
   </div>
 </div></div>
@@ -675,16 +677,19 @@ function startMission(i){mi=i;const m=MISSIONS[i];clearDyn();buildVehicles();
 function endMission(win,why){if(state!=='play')return;state='end';if(document.pointerLockElement)document.exitPointerLock();$('hud').classList.remove('on');
   const m=MISSIONS[mi];let rows=[['Veiksmų taškai',score]],total=score;
   if(win){const tb=Math.round(tLeft)*5,sb=detected?0:1500;rows.push(['Misija įvykdyta',1000],['Laiko bonusas',tb],[detected?'Buvai pastebėtas':'Nepastebėtas – „Šešėlio“ bonusas',sb]);total+=1000+tb+sb;SFX.win()}else SFX.fail();
-  total=Math.max(0,total);rows.push(['IŠ VISO',win?total:0]);
+  total=Math.max(0,total);rows.push(['IŠ VISO',win?total:0]);if(win)rows.push(['Laikas',fmtT(m.time-tLeft),'eTime']);
   $('eTitle').innerHTML=win?'Misija <span>įvykdyta</span>':'Misija <span style="color:var(--red)">žlugo</span>';$('eSub').textContent=win?m.name:why+'. Taškai neįskaitomi.';
-  $('eTab').innerHTML=rows.map(r=>`<tr><td></td><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
-  let note='';if(win){const prev=(profile.best||{})[m.id]||0;
+  $('eTab').innerHTML=rows.map(r=>`<tr><td></td><td>${r[0]}</td><td${r[2]?` id="${r[2]}"`:''}>${r[1]}</td></tr>`).join('');
+  let note='';if(win){const prev=(profile.best||{})[m.id]||0,prevT=(profile.bestTime||{})[m.id],pts=()=>total>prev?' Naujas taškų rekordas!':' Taškų rekordas: '+prev+'.';
     if(mode==='supa'){note='Rezultatas siunčiamas…';const run=runId;runId=null;
       (run?rpc('lv_finish',{p_name:sess.name,p_token:sess.token,p_run:run,p_score:total}):Promise.reject(0)).then(r=>{
         if(!r||r.error){$('eNote').textContent=r&&r.error==='rejected'?'Serveris šio rezultato nepriėmė.':'Rezultato išsaugoti nepavyko – prisijunk iš naujo.';return}
-        profile.best=r.best||profile.best;$('eNote').textContent=total>prev?'Naujas asmeninis rekordas!':'Asmeninis rekordas: '+prev})
+        profile.best=r.best||profile.best;profile.bestTime=r.best_time||profile.bestTime;if(r.time!=null)$('eTime').textContent=fmtT(r.time);
+        $('eNote').textContent=(r.time!=null?timeNote(+r.time,prevT):'')+pts()})
       .catch(()=>{$('eNote').textContent='Rezultato išsaugoti nepavyko (nėra ryšio su serveriu).'})}
-    else if(total>prev){profile.best={...(profile.best||{}),[m.id]:total};note='Naujas asmeninis rekordas!';saveProfile()}else note='Asmeninis rekordas: '+prev}
+    else{const el=Math.round((m.time-tLeft)*10)/10,newT=prevT==null||el<prevT;
+      if(newT)profile.bestTime={...(profile.bestTime||{}),[m.id]:el};if(total>prev)profile.best={...(profile.best||{}),[m.id]:total};
+      if(newT||total>prev)saveProfile();note=timeNote(el,prevT)+pts()}}
   $('eNote').textContent=note;$('eNext').style.display=win&&mi<MISSIONS.length-1?'':'none';show('sEnd')}
 
 /* ================= MINIMAP ================= */
@@ -731,6 +736,11 @@ async function hashPw(pw,salt){try{const enc=new TextEncoder(),key=await crypto.
   const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(salt),iterations:60000,hash:'SHA-256'},key,256);return'p1$'+[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
   catch(e){let h=2166136261;const s=salt+'|'+pw;for(let r=0;r<3000;r++){for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}h^=r}return'f1$'+(h>>>0).toString(16)}}
 const total=p=>Object.values(p.best||{}).reduce((a,b)=>a+(+b||0),0);
+// Mission times: best (lowest) seconds per mission; the leaderboard ranks by missions done, then by the sum of best times.
+const doneN=p=>Object.keys(p.bestTime||{}).length,sumT=p=>Object.values(p.bestTime||{}).reduce((a,b)=>a+(+b||0),0);
+const fmtT=s=>{s=Math.round((+s||0)*10)/10;const m=Math.floor(s/60),r=s-m*60;return m+':'+(r<10?'0':'')+r.toFixed(1)};
+const fmtTs=s=>{s=Math.round(+s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const timeNote=(el,prevT)=>'Laikas '+fmtT(el)+(prevT==null||el<prevT?' – naujas laiko rekordas!':' (rekordas '+fmtT(prevT)+').');
 async function initBackend(){
   if(SUPA.url&&SUPA.key){try{await rpc('lv_board');mode='supa'}catch(e){}}
   if(mode!=='supa'){
@@ -739,7 +749,7 @@ async function initBackend(){
     if(mode==='local'){try{authDoc=JSON.parse(lsGet('lv_auth')||'null')}catch(e){authDoc=null}}}
   try{sess=JSON.parse(lsGet('lv_sess')||'null')}catch(e){sess=null}
   if(sess&&sess.mode===mode){try{
-    if(mode==='supa'){const r=await rpc('lv_resume',{p_name:sess.name,p_token:sess.token});if(r&&!r.error){profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{},admin:!!r.admin};lsSet(devKey(r.name),r.token);return enterMain()}}
+    if(mode==='supa'){const r=await rpc('lv_resume',{p_name:sess.name,p_token:sess.token});if(r&&!r.error){profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{},bestTime:r.best_time||{},admin:!!r.admin};lsSet(devKey(r.name),r.token);return enterMain()}}
     else if(authDoc&&sess.token===authDoc.hash.slice(0,24)){await loadProfile();return enterMain()}}catch(e){}}
   showAuth()}
 function showAuth(){$('authForm').style.display='';$('aErr').textContent='';$('aPass').value='';
@@ -753,7 +763,7 @@ async function doAuth(reg){const name=$('aName').value.trim(),pw=$('aPass').valu
    const nl=name.toLowerCase();
    if(mode==='supa'){const r=await rpc(reg?'lv_register':'lv_login',reg?{p_name:name,p_pass:pw}:{p_name:name,p_pass:pw,p_device:lsGet(devKey(name))||null});
      if(r.error)return err(r.error==='taken'?'Toks vardas jau užimtas.':r.error==='bad_input'?'Netinkamas vardas arba slaptažodis.':r.error==='locked'?'Per daug bandymų – palauk 10 minučių.':r.error==='full'?'Registracija laikinai sustabdyta. Bandyk vėliau.':'Neteisingas vardas arba slaptažodis.');
-     profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{},admin:!!r.admin};sess={mode,name:r.name,token:r.token};lsSet(devKey(r.name),r.token)}
+     profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{},bestTime:r.best_time||{},admin:!!r.admin};sess={mode,name:r.name,token:r.token};lsSet(devKey(r.name),r.token)}
    else if(reg){if(authDoc)return err('Čia jau užregistruotas agentas „'+authDoc.name+'“ – prisijunk juo.');
      if(mode==='claude'){const q=await timeout(db.collection('players').where('nameLower','==',nl).get(),10000);if(q.docs.some(d=>d.id!==uid))return err('Toks vardas jau užimtas.')}
      const salt=Math.random().toString(36).slice(2)+Date.now().toString(36),hash=await hashPw(pw,salt);authDoc={name,salt,hash};profile={name,nameLower:nl,best:{}};
@@ -766,18 +776,21 @@ async function doAuth(reg){const name=$('aName').value.trim(),pw=$('aPass').valu
   }catch(x){err('Nepavyko susisiekti su duomenų baze. Bandyk dar kartą.')}}
 $('authForm').addEventListener('submit',e=>{e.preventDefault();doAuth(false)});$('aReg').onclick=()=>doAuth(true);
 async function loadProfile(){profile={name:authDoc.name,nameLower:authDoc.name.toLowerCase(),best:{}};
-  if(mode==='claude'){try{const s=await timeout(db.doc('players/'+uid).get(),10000);if(s.exists){const d=s.data();profile.best={...(d.best||{})}}}catch(e){}}
-  else{try{const p=JSON.parse(lsGet('lv_profile')||'null');if(p&&p.best)profile.best=p.best}catch(e){}}}
-function saveProfile(){const doc={name:profile.name,nameLower:profile.nameLower,best:profile.best,total:total(profile),updated:Date.now()};
+  if(mode==='claude'){try{const s=await timeout(db.doc('players/'+uid).get(),10000);if(s.exists){const d=s.data();profile.best={...(d.best||{})};profile.bestTime={...(d.bestTime||{})}}}catch(e){}}
+  else{try{const p=JSON.parse(lsGet('lv_profile')||'null');if(p&&p.best)profile.best=p.best;if(p&&p.bestTime)profile.bestTime=p.bestTime}catch(e){}}}
+function saveProfile(){const doc={name:profile.name,nameLower:profile.nameLower,best:profile.best,bestTime:profile.bestTime||{},total:total(profile),updated:Date.now()};
   if(mode==='supa')return;
   else if(mode==='claude')saveChain=saveChain.then(()=>db.doc('players/'+uid).set(doc)).catch(()=>{lsSet('lv_profile',JSON.stringify(doc))});else lsSet('lv_profile',JSON.stringify(doc))}
-async function loadBoard(){const tb=$('board');const render=rows=>{tb.innerHTML='';rows.forEach((r,i)=>{const tr=document.createElement('tr');if(r.me)tr.className='me';[i+1,r.name,r.total].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});tb.appendChild(tr)})};
-  const me={name:profile.name,total:total(profile),me:true};render(profile.admin?[]:[me]);
+async function loadBoard(){const tb=$('board');const render=rows=>{tb.innerHTML='';rows.forEach((r,i)=>{const tr=document.createElement('tr');if(r.me)tr.className='me';
+    [i+1,r.name,r.missions+'/'+MISSIONS.length,r.missions?fmtTs(r.secs):'—'].forEach((v,k)=>{const td=document.createElement('td');td.textContent=v;if(k===2)td.className='bm';tr.appendChild(td)});tb.appendChild(tr)})};
+  const me={name:profile.name,total:total(profile),missions:doneN(profile),secs:sumT(profile),me:true};render(profile.admin?[]:[me]);
   if(mode==='local'){$('boardNote').textContent='Rodomas tik tavo rezultatas (bendra lentelė nepasiekiama).';return}
   try{let rows;
-    if(mode==='supa'){const q=await rpc('lv_board');rows=(q||[]).map(x=>({name:String(x.name||'?').slice(0,16),total:+x.total||0,me:String(x.name).toLowerCase()===profile.nameLower}))}
-    else{const q=await timeout(db.collection('players').orderBy('total','desc').limit(15).get(),10000);rows=q.docs.map(d=>{const x=d.data();return{name:String(x.name||'?').slice(0,16),total:+x.total||0,me:d.id===uid}})}
-    if(profile.admin)rows=rows.filter(r=>!r.me);else if(!rows.some(r=>r.me))rows.push(me);else rows.forEach(r=>{if(r.me)r.total=Math.max(r.total,me.total)});rows.sort((a,b)=>b.total-a.total);render(rows);$('boardNote').textContent=''}
+    if(mode==='supa'){const q=await rpc('lv_board');rows=(q||[]).map(x=>({name:String(x.name||'?').slice(0,16),total:+x.total||0,missions:+x.missions||0,secs:+x.secs||0,me:String(x.name).toLowerCase()===profile.nameLower}))}
+    else{const q=await timeout(db.collection('players').orderBy('total','desc').limit(15).get(),10000);rows=q.docs.map(d=>{const x=d.data();return{name:String(x.name||'?').slice(0,16),total:+x.total||0,missions:doneN(x),secs:sumT(x),me:d.id===uid}})}
+    if(profile.admin)rows=rows.filter(r=>!r.me);else if(!rows.some(r=>r.me))rows.push(me);
+    else rows.forEach(r=>{if(r.me&&(me.missions>r.missions||(me.missions===r.missions&&me.secs<r.secs)))Object.assign(r,{missions:me.missions,secs:me.secs,total:me.total})});
+    rows.sort((a,b)=>b.missions-a.missions||a.secs-b.secs||b.total-a.total);render(rows);$('boardNote').textContent=''}
   catch(e){$('boardNote').textContent='Lentelės užkrauti nepavyko.'}}
 /* Admin (Supabase only): unlock locked agents and reset forgotten passwords. The server checks the admin flag on every call. */
 const ADM_ERR={forbidden:'Nėra admin teisių – prisijunk iš naujo.',not_found:'Tokio agento nėra.',bad_input:'Slaptažodis – 4–64 simboliai.'};
@@ -806,11 +819,11 @@ $('logout').onclick=()=>{lsSet('lv_sess',null);showAuth()};$('musBtn').onclick=t
 
 /* ================= SCREENS ================= */
 function show(id){for(const s of document.querySelectorAll('.screen'))s.classList.toggle('on',s.id===id)}
-function enterMain(){state='menu';$('hud').classList.remove('on');$('big').classList.remove('on');$('whoName').textContent=profile.name;$('whoTot').textContent=total(profile)+' tšk.';
+function enterMain(){state='menu';$('hud').classList.remove('on');$('big').classList.remove('on');$('whoName').textContent=profile.name;$('whoTot').textContent=doneN(profile)+'/'+MISSIONS.length+' · '+fmtTs(sumT(profile))+' · '+total(profile)+' tšk.';
   $('admLink').style.display=profile.admin&&mode==='supa'?'':'none';
   const un=profile.admin?MISSIONS.length:MISSIONS.filter(m=>(profile.best||{})[m.id]).length;const ml=$('misList');ml.innerHTML='';
-  MISSIONS.forEach((m,i)=>{const d=document.createElement('div');d.className='mis'+(i>un?' lock':'');const b=(profile.best||{})[m.id];
-    d.innerHTML=`<div class="n">${i+1}</div><div><div class="t">${m.name}</div><div class="d">${m.obj.map(o=>o.txt+' ×'+o.n).join(' · ')}</div></div><div class="b">${b?b:i>un?'🔒':'—'}<small>${b?'rekordas':''}</small></div>`;
+  MISSIONS.forEach((m,i)=>{const d=document.createElement('div');d.className='mis'+(i>un?' lock':'');const b=(profile.best||{})[m.id],bt=(profile.bestTime||{})[m.id];
+    d.innerHTML=`<div class="n">${i+1}</div><div><div class="t">${m.name}</div><div class="d">${m.obj.map(o=>o.txt+' ×'+o.n).join(' · ')}</div></div><div class="b">${bt!=null?fmtT(bt):b?b:i>un?'🔒':'—'}<small>${bt!=null?'geriausias laikas'+(b?' · '+b+' tšk.':''):b?'rekordas':''}</small></div>`;
     d.onclick=()=>brief(i);ml.appendChild(d)});
   show('sMain');loadBoard()}
 function brief(i){mi=i;const m=MISSIONS[i];$('bNum').textContent='Misija '+(i+1)+' iš '+MISSIONS.length;$('bName').textContent=m.name;$('bText').textContent=m.brief;
