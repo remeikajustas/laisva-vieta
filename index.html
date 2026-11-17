@@ -42,6 +42,11 @@ td{padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.07)}
 td:first-child{color:var(--mut);width:28px}
 td:last-child{text-align:right;font-family:Oswald;font-size:16px}
 tr.me td{color:var(--gold)}
+#admList td,#admList th{padding:7px 8px;text-align:left;font-family:inherit;font-size:14px;color:var(--txt);width:auto;border-bottom:1px solid rgba(255,255,255,.07)}
+#admList th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase}
+#admList td.lk{color:#ff6b5e}#admList td.act{text-align:right;white-space:nowrap}
+#admList button{padding:5px 10px;font-size:12px;margin-left:6px}
+#admList input{width:150px;padding:5px 8px;font-size:13px;margin:0 0 0 6px}
 .keys{font-size:12.5px;color:var(--mut);line-height:1.9;margin-top:14px}
 kbd{background:#1b1f2a;border:1px solid #333a4a;border-radius:3px;padding:1px 6px;color:#fff;font-family:inherit;font-size:11.5px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -128,12 +133,19 @@ kbd{background:#1b1f2a;border:1px solid #333a4a;border-radius:3px;padding:1px 6p
 <div id="sMain" class="screen"><div class="card">
   <div class="top"><div><h1>Operacija <span>„Laisva vieta“</span></h1>
     <p class="sub">Bendra aikštelė prie biuro. „Rekon“ vilkikai užima po šešias vietas, „Edirxepa“ sandėliuoja pardavimui skirtus automobilius be numerių, o trečią mėnesį stovintys „vaiduokliai“ jau apaugo samanomis. Gražiuoju jau kalbėjom. Nieko asmeniško – tik parkingas.</p></div>
-    <div class="who">Agentas<br><b id="whoName"></b><br><span id="whoTot"></span><br><a id="musBtn">Muzika: įjungta</a> · <a id="logout">Atsijungti</a></div></div>
+    <div class="who">Agentas<br><b id="whoName"></b><br><span id="whoTot"></span><br><a id="musBtn">Muzika: įjungta</a> · <a id="logout">Atsijungti</a><span id="admLink" style="display:none"> · <a id="admBtn">Admin</a></span></div></div>
   <div class="grid">
     <div><h2>Misijos</h2><div id="misList"></div></div>
     <div><h2>Geriausi agentai</h2><table id="board"></table><div class="note" id="boardNote"></div>
       <div class="keys"><kbd>W A S D</kbd> judėti · <kbd>Pelė</kbd> dairytis · <kbd>Shift</kbd> bėgti (triukšminga) · <kbd>C</kbd> pritūpti (tyliau, slepia už auto) · <kbd>1–6</kbd> / ratukas – įrankis · <kbd>KPM</kbd> naudoti · <kbd>G</kbd> sprogdinti C4 · <kbd>M</kbd> žemėlapis · <kbd>E</kbd> grįžti į biurą · <kbd>N</kbd> muzika · <kbd>Esc</kbd> pauzė</div></div>
   </div>
+</div></div>
+
+<div id="sAdmin" class="screen"><div class="card" style="max-width:760px">
+  <h1>Admin</h1><p class="sub">Užrakintų agentų atrakinimas ir pamirštų slaptažodžių keitimas. Pakeitus slaptažodį, agentas atjungiamas visuose įrenginiuose.</p>
+  <div style="max-height:56vh;overflow:auto"><table id="admList"></table></div>
+  <div class="note" id="admNote" style="margin:12px 0 16px"></div>
+  <div class="row"><button id="admBack">Atgal</button><button class="ghost" id="admRefresh">Atnaujinti</button></div>
 </div></div>
 
 <div id="sBrief" class="screen"><div class="card narrow" style="max-width:560px">
@@ -727,7 +739,7 @@ async function initBackend(){
     if(mode==='local'){try{authDoc=JSON.parse(lsGet('lv_auth')||'null')}catch(e){authDoc=null}}}
   try{sess=JSON.parse(lsGet('lv_sess')||'null')}catch(e){sess=null}
   if(sess&&sess.mode===mode){try{
-    if(mode==='supa'){const r=await rpc('lv_resume',{p_name:sess.name,p_token:sess.token});if(r&&!r.error){profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{}};lsSet(devKey(r.name),r.token);return enterMain()}}
+    if(mode==='supa'){const r=await rpc('lv_resume',{p_name:sess.name,p_token:sess.token});if(r&&!r.error){profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{},admin:!!r.admin};lsSet(devKey(r.name),r.token);return enterMain()}}
     else if(authDoc&&sess.token===authDoc.hash.slice(0,24)){await loadProfile();return enterMain()}}catch(e){}}
   showAuth()}
 function showAuth(){$('authForm').style.display='';$('aErr').textContent='';$('aPass').value='';
@@ -741,7 +753,7 @@ async function doAuth(reg){const name=$('aName').value.trim(),pw=$('aPass').valu
    const nl=name.toLowerCase();
    if(mode==='supa'){const r=await rpc(reg?'lv_register':'lv_login',reg?{p_name:name,p_pass:pw}:{p_name:name,p_pass:pw,p_device:lsGet(devKey(name))||null});
      if(r.error)return err(r.error==='taken'?'Toks vardas jau užimtas.':r.error==='bad_input'?'Netinkamas vardas arba slaptažodis.':r.error==='locked'?'Per daug bandymų – palauk 10 minučių.':r.error==='full'?'Registracija laikinai sustabdyta. Bandyk vėliau.':'Neteisingas vardas arba slaptažodis.');
-     profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{}};sess={mode,name:r.name,token:r.token};lsSet(devKey(r.name),r.token)}
+     profile={name:r.name,nameLower:r.name.toLowerCase(),best:r.best||{},admin:!!r.admin};sess={mode,name:r.name,token:r.token};lsSet(devKey(r.name),r.token)}
    else if(reg){if(authDoc)return err('Čia jau užregistruotas agentas „'+authDoc.name+'“ – prisijunk juo.');
      if(mode==='claude'){const q=await timeout(db.collection('players').where('nameLower','==',nl).get(),10000);if(q.docs.some(d=>d.id!==uid))return err('Toks vardas jau užimtas.')}
      const salt=Math.random().toString(36).slice(2)+Date.now().toString(36),hash=await hashPw(pw,salt);authDoc={name,salt,hash};profile={name,nameLower:nl,best:{}};
@@ -760,19 +772,43 @@ function saveProfile(){const doc={name:profile.name,nameLower:profile.nameLower,
   if(mode==='supa')return;
   else if(mode==='claude')saveChain=saveChain.then(()=>db.doc('players/'+uid).set(doc)).catch(()=>{lsSet('lv_profile',JSON.stringify(doc))});else lsSet('lv_profile',JSON.stringify(doc))}
 async function loadBoard(){const tb=$('board');const render=rows=>{tb.innerHTML='';rows.forEach((r,i)=>{const tr=document.createElement('tr');if(r.me)tr.className='me';[i+1,r.name,r.total].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});tb.appendChild(tr)})};
-  const me={name:profile.name,total:total(profile),me:true};render([me]);
+  const me={name:profile.name,total:total(profile),me:true};render(profile.admin?[]:[me]);
   if(mode==='local'){$('boardNote').textContent='Rodomas tik tavo rezultatas (bendra lentelė nepasiekiama).';return}
   try{let rows;
     if(mode==='supa'){const q=await rpc('lv_board');rows=(q||[]).map(x=>({name:String(x.name||'?').slice(0,16),total:+x.total||0,me:String(x.name).toLowerCase()===profile.nameLower}))}
     else{const q=await timeout(db.collection('players').orderBy('total','desc').limit(15).get(),10000);rows=q.docs.map(d=>{const x=d.data();return{name:String(x.name||'?').slice(0,16),total:+x.total||0,me:d.id===uid}})}
-    if(!rows.some(r=>r.me))rows.push(me);else rows.forEach(r=>{if(r.me)r.total=Math.max(r.total,me.total)});rows.sort((a,b)=>b.total-a.total);render(rows);$('boardNote').textContent=''}
+    if(profile.admin)rows=rows.filter(r=>!r.me);else if(!rows.some(r=>r.me))rows.push(me);else rows.forEach(r=>{if(r.me)r.total=Math.max(r.total,me.total)});rows.sort((a,b)=>b.total-a.total);render(rows);$('boardNote').textContent=''}
   catch(e){$('boardNote').textContent='Lentelės užkrauti nepavyko.'}}
+/* Admin (Supabase only): unlock locked agents and reset forgotten passwords. The server checks the admin flag on every call. */
+const ADM_ERR={forbidden:'Nėra admin teisių – prisijunk iš naujo.',not_found:'Tokio agento nėra.',bad_input:'Slaptažodis – 4–64 simboliai.'};
+const admFail=t=>{$('admNote').textContent=t};
+async function loadAdmin(msg){const tb=$('admList');admFail(msg||'Kraunama…');
+  try{const r=await rpc('lv_admin_list',{p_name:sess.name,p_token:sess.token});
+    if(!Array.isArray(r)){tb.innerHTML='';return admFail(ADM_ERR[r&&r.error]||'Sąrašo užkrauti nepavyko.')}
+    tb.innerHTML='';const h=document.createElement('tr');['Agentas','Taškai','Būsena',''].forEach(t=>{const th=document.createElement('th');th.textContent=t;h.appendChild(th)});tb.appendChild(h);
+    for(const p of r){const tr=document.createElement('tr'),st=document.createElement('td'),act=document.createElement('td');
+      [p.name,p.total].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});
+      st.textContent=p.locked?'Užrakintas iki '+new Date(p.locked_until).toLocaleTimeString('lt-LT',{hour:'2-digit',minute:'2-digit'}):p.fails?'Blogų bandymų: '+p.fails:'Gerai';if(p.locked)st.className='lk';tr.appendChild(st);
+      const ub=document.createElement('button');ub.className='ghost';ub.textContent='Atrakinti';ub.disabled=!p.locked&&!p.fails;ub.onclick=()=>admDo(p.name,null,ub);
+      const pb=document.createElement('button');pb.className='ghost';pb.textContent='Naujas slaptažodis';
+      pb.onclick=()=>{pb.style.display='none';const inp=document.createElement('input');inp.type='text';inp.maxLength=64;inp.autocomplete='off';inp.placeholder='naujas slaptažodis';
+        const sb=document.createElement('button');sb.textContent='Išsaugoti';sb.onclick=()=>admDo(p.name,inp.value,sb);inp.onkeydown=e=>{if(e.key==='Enter')sb.click()};act.append(inp,sb);inp.focus()};
+      act.className='act';act.append(ub,pb);tr.appendChild(act);tb.appendChild(tr)}
+    admFail(msg||(r.length?'':'Agentų dar nėra.'))}
+  catch(e){admFail('Nepavyko susisiekti su duomenų baze.')}}
+async function admDo(name,pw,btn){if(pw!=null&&(pw.length<4||pw.length>64))return admFail(ADM_ERR.bad_input);btn.disabled=true;
+  try{const r=await rpc('lv_admin_unlock',{p_name:sess.name,p_token:sess.token,p_target:name,p_newpass:pw});
+    if(!r||r.error){btn.disabled=false;return admFail(ADM_ERR[r&&r.error]||'Nepavyko.')}
+    await loadAdmin(pw!=null?'Išsaugota: „'+name+'“ slaptažodis pakeistas.':'Išsaugota: „'+name+'“ atrakintas.')}
+  catch(e){btn.disabled=false;admFail('Nepavyko susisiekti su duomenų baze.')}}
+$('admBtn').onclick=()=>{show('sAdmin');loadAdmin()};$('admBack').onclick=enterMain;$('admRefresh').onclick=()=>loadAdmin();
 $('logout').onclick=()=>{lsSet('lv_sess',null);showAuth()};$('musBtn').onclick=toggleMusic;if(!musicOn)$('musBtn').textContent='Muzika: išjungta';
 
 /* ================= SCREENS ================= */
 function show(id){for(const s of document.querySelectorAll('.screen'))s.classList.toggle('on',s.id===id)}
 function enterMain(){state='menu';$('hud').classList.remove('on');$('big').classList.remove('on');$('whoName').textContent=profile.name;$('whoTot').textContent=total(profile)+' tšk.';
-  const un=MISSIONS.filter(m=>(profile.best||{})[m.id]).length;const ml=$('misList');ml.innerHTML='';
+  $('admLink').style.display=profile.admin&&mode==='supa'?'':'none';
+  const un=profile.admin?MISSIONS.length:MISSIONS.filter(m=>(profile.best||{})[m.id]).length;const ml=$('misList');ml.innerHTML='';
   MISSIONS.forEach((m,i)=>{const d=document.createElement('div');d.className='mis'+(i>un?' lock':'');const b=(profile.best||{})[m.id];
     d.innerHTML=`<div class="n">${i+1}</div><div><div class="t">${m.name}</div><div class="d">${m.obj.map(o=>o.txt+' ×'+o.n).join(' · ')}</div></div><div class="b">${b?b:i>un?'🔒':'—'}<small>${b?'rekordas':''}</small></div>`;
     d.onclick=()=>brief(i);ml.appendChild(d)});

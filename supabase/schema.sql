@@ -1,4 +1,4 @@
--- Operacija "Laisva vieta" - visa Supabase schema (galutine busena po triju migraciju).
+-- Operacija "Laisva vieta" - visa Supabase schema (galutine busena po keturiu migraciju; paskutine - lv_admin_role).
 -- Projektas: laisva-vieta (ref ymffiqwouoglefvvzfru, eu-central-1). Jau pritaikyta; sis failas - atkurimui.
 create extension if not exists pgcrypto with schema extensions;
 
@@ -11,8 +11,10 @@ create table if not exists public.lv_players (
   total      int  not null default 0,
   updated    timestamptz not null default now(),
   fails      int  not null default 0,
-  locked_until timestamptz
+  locked_until timestamptz,
+  is_admin   boolean not null default false
 );
+alter table public.lv_players add column if not exists is_admin boolean not null default false;
 create table if not exists public.lv_runs (
   id uuid primary key default gen_random_uuid(),
   name_lower text not null references public.lv_players(name_lower) on delete cascade,
@@ -60,7 +62,7 @@ begin
     return json_build_object('error','invalid');
   end if;
   if known then update lv_players set fails = 0, locked_until = null where name_lower = r.name_lower and (fails <> 0 or locked_until is not null); end if;
-  return json_build_object('name',r.name,'token',r.token,'best',r.best);
+  return json_build_object('name',r.name,'token',r.token,'best',r.best,'admin',r.is_admin);
 end $$;
 
 create or replace function public.lv_resume(p_name text, p_token uuid) returns json
@@ -69,7 +71,7 @@ declare r lv_players;
 begin
   select * into r from lv_players where name_lower = lower(btrim(p_name)) and token = p_token;
   if not found then return json_build_object('error','invalid'); end if;
-  return json_build_object('name',r.name,'token',r.token,'best',r.best);
+  return json_build_object('name',r.name,'token',r.token,'best',r.best,'admin',r.is_admin);
 end $$;
 
 create or replace function public.lv_start(p_name text, p_token uuid, p_mission text) returns json
@@ -107,8 +109,36 @@ end $$;
 
 create or replace function public.lv_board() returns json
 language sql security definer set search_path = public as $$
-  select coalesce(json_agg(q),'[]'::json) from (select name,total from lv_players order by total desc, updated asc limit 15) q;
+  select coalesce(json_agg(q),'[]'::json) from (select name,total from lv_players where not is_admin order by total desc, updated asc limit 15) q;
 $$;
+
+-- Admin: player list with lock status. Caller must be an admin (name + token).
+create or replace function public.lv_admin_list(p_name text, p_token uuid) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  perform 1 from lv_players where name_lower = lower(btrim(p_name)) and token = p_token and is_admin;
+  if not found then return json_build_object('error','forbidden'); end if;
+  return (select coalesce(json_agg(q),'[]'::json) from (
+    select name, total, fails, (locked_until is not null and locked_until > now()) as locked, locked_until, updated
+      from lv_players where not is_admin order by updated desc limit 500) q);
+end $$;
+
+-- Admin: clear lockout; with p_newpass also set a new password and rotate the token (logs the player out everywhere).
+create or replace function public.lv_admin_unlock(p_name text, p_token uuid, p_target text, p_newpass text default null) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  perform 1 from lv_players where name_lower = lower(btrim(p_name)) and token = p_token and is_admin;
+  if not found then return json_build_object('error','forbidden'); end if;
+  if p_target is null or (p_newpass is not null and char_length(p_newpass) not between 4 and 64) then
+    return json_build_object('error','bad_input'); end if;
+  update lv_players set fails = 0, locked_until = null,
+         pass_hash = case when p_newpass is null then pass_hash else crypt(p_newpass, gen_salt('bf')) end,
+         token     = case when p_newpass is null then token else gen_random_uuid() end
+   where name_lower = lower(btrim(p_target)) and not is_admin;
+  if not found then return json_build_object('error','not_found'); end if;
+  return json_build_object('ok',true,'password_changed',p_newpass is not null);
+end $$;
+-- Admin account itself is created by hand (is_admin = true); its password is not stored in this file.
 
 drop function if exists public.lv_save(text,uuid,jsonb);
 
@@ -116,3 +146,5 @@ revoke all on function public.lv_register(text,text), public.lv_login(text,text,
   public.lv_start(text,uuid,text), public.lv_finish(text,uuid,uuid,int), public.lv_board() from public;
 grant execute on function public.lv_register(text,text), public.lv_login(text,text,uuid), public.lv_resume(text,uuid),
   public.lv_start(text,uuid,text), public.lv_finish(text,uuid,uuid,int), public.lv_board() to anon, authenticated;
+revoke all on function public.lv_admin_list(text,uuid), public.lv_admin_unlock(text,uuid,text,text) from public;
+grant execute on function public.lv_admin_list(text,uuid), public.lv_admin_unlock(text,uuid,text,text) to anon, authenticated;

@@ -31,6 +31,16 @@ Apsaugos: slaptažodžiai hash'uojami serveryje (bcrypt); 5 neteisingi bandymai 
 įrenginį, kuris jau buvo prisijungęs); rezultatas priimamas tik su vienkartiniu misijos bilietu (`lv_start` →
 `lv_finish`), ne greičiau kaip po 15 s ir neviršijant misijos lubų.
 
+## Admin
+Agentas su `lv_players.is_admin = true` (dabar – `admin`; slaptažodis čia nesaugomas):
+- mato visas 6 misijas iškart ir nerodomas lentelėje „Geriausi agentai“;
+- meniu nuoroda „Admin“ atidaro sąrašą su mygtukais „Atrakinti“ (nuima 10 min. užraktą) ir „Naujas slaptažodis“
+  (pakeičia slaptažodį ir atjungia agentą visuose įrenginiuose).
+
+Serveryje tai daro `lv_admin_list` ir `lv_admin_unlock`; abi kiekvieną kartą tikrina admin požymį pagal vardą ir token.
+Kito admino atrakinti ar pakeisti negalima. Naują adminą skirti tik SQL:
+`update lv_players set is_admin = true where name_lower = '<vardas>';`
+
 ## Patikrinta (2026-11-17, iš naršyklės per GitHub Pages)
 - Registracija (`lv_register`), sesijos atkūrimas perkrovus puslapį (`lv_resume`) ir prisijungimas (`lv_login`).
 - 1 misija: `lv_start` grąžina bilietą, `lv_finish` po >15 s priima rezultatą, jis atsiranda lentelėje
